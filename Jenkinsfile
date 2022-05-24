@@ -53,21 +53,29 @@ pipeline {
                 )
             }
         }
+        stage('smoke test') {
+            when {
+                branch 'master'
+            }
+            steps {
+                scripts{
+                    sleep (time: 5)
+                    def response = httpRequest (
+                        url: "http://$KUBE_MASTER_IP:8081/",
+                        timeout: 30
+                  )
+                if (response.status !=200) {
+                    error("Somke test against canary deployment failed!!")
+                }
+             }
+          }
+       }
         stage('DeployToProduction') {
             when {
                 branch 'master'
             }
-            environment { 
-                CANARY_REPLICAS = 0
-            }
             steps {
-                input 'Deploy to Production?'
                 milestone(1)
-                kubernetesDeploy(
-                    kubeconfigId: 'kubeconfig',
-                    configs: 'train-schedule-kube-canary.yml',
-                    enableConfigSubstitution: true
-                )
                 kubernetesDeploy(
                     kubeconfigId: 'kubeconfig',
                     configs: 'train-schedule-kube.yml',
@@ -75,5 +83,14 @@ pipeline {
                 )
             }
         }
-    }
 }
+post {
+    cleanup {
+        kubernetesDeploy (
+            kubeconfigId: 'kubeconfig',
+            configs: 'train-sechdule-kube-canary.yml',
+            enableCOnfigSubstitution: true       
+        )
+     }   
+   }       
+}    
